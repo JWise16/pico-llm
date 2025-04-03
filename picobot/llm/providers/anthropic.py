@@ -24,6 +24,8 @@ class AnthropicProvider(LLMInterface):
         self.temperature = temperature
         self.max_tokens = max_tokens
         self.client = None
+        self.total_tokens = 0
+        self.total_cost = 0.0
         self.initialize()
     
     def initialize(self) -> None:
@@ -33,13 +35,12 @@ class AnthropicProvider(LLMInterface):
             raise RuntimeError("ANTHROPIC_API_KEY environment variable not set")
         
         try:
-            # Initialize with just the API key, no additional parameters
-            self.client = anthropic.Client(api_key=api_key)
+            # Initialize with just the API key
+            self.client = anthropic.Anthropic(api_key=api_key)
             # Test the connection with a simple request
             self.client.messages.create(
                 model=self.model,
                 max_tokens=10,
-                temperature=self.temperature,
                 messages=[{
                     "role": "user",
                     "content": "Test connection. Respond in JSON format."
@@ -93,7 +94,7 @@ Surroundings:
                 model=self.model,
                 max_tokens=self.max_tokens,
                 temperature=self.temperature,
-                system="You are a Picobot controller that always responds in valid JSON format with move, reasoning, and confidence fields.",
+                system="You are a Picobot controller that always responds in valid JSON format with move, reasoning, and confidence fields. When generating rules, create a sophisticated state machine that uses different states for different exploration strategies.",
                 messages=[
                     {
                         "role": "user",
@@ -105,24 +106,50 @@ Current State:
 Please analyze the state and choose the next move. Respond in JSON format with:
 - move: The chosen direction (North/South/East/West)
 - reasoning: Your explanation for the choice
-- confidence: Your confidence in the move (0.0 to 1.0)"""
+- confidence: Your confidence in the move (0.0 to 1.0)
+
+If you see a prompt about generating rules, please provide a complete set of rules in your reasoning field. The rules should use states strategically:
+- State 0: Basic wall following (clockwise)
+- State 1: Corner handling and direction changes
+- State 2: Backtracking from dead ends
+- State 3: Counter-clockwise wall following
+- State 4: Special case handling for unexplored areas
+
+Make sure to include state transitions that create an effective exploration pattern."""
                     }
                 ]
             )
             
-            # Parse the response - content is now a list of TextBlock objects
-            response_text = message.content[0].text
-            # Remove code block markers if present
-            if response_text.startswith('```json\n'):
-                response_text = response_text[8:]  # Remove ```json\n
-            if response_text.endswith('\n```'):
-                response_text = response_text[:-4]  # Remove \n```
+            # Update token usage
+            self.total_tokens += message.usage.input_tokens + message.usage.output_tokens
+            
+            # Parse the response - content is now a list of content blocks
+            response_text = ""
+            for content_block in message.content:
+                if hasattr(content_block, 'text'):
+                    response_text += content_block.text
+                else:
+                    response_text += str(content_block)
+            
+            # Clean up the response text
+            response_text = response_text.replace('\r', '').replace('\t', ' ')
+            
+            # Find the JSON part of the response
+            start = response_text.find('{')
+            end = response_text.rfind('}') + 1
+            if start >= 0 and end > start:
+                response_text = response_text[start:end]
             
             import json
             try:
                 response = json.loads(response_text)
             except json.JSONDecodeError as e:
-                raise ValueError(f"Failed to parse JSON response: {str(e)}")
+                # Try to clean up the response text further
+                response_text = ''.join(c for c in response_text if c.isprintable())
+                try:
+                    response = json.loads(response_text)
+                except json.JSONDecodeError as e2:
+                    raise ValueError(f"Failed to parse JSON response: {str(e2)}")
             
             # Validate the response
             if not all(k in response for k in ["move", "reasoning", "confidence"]):
@@ -141,4 +168,15 @@ Please analyze the state and choose the next move. Respond in JSON format with:
     
     def cleanup(self) -> None:
         """Clean up any resources used by the provider."""
-        self.client = None 
+        self.client = None
+        
+    def get_metrics(self) -> Dict[str, Any]:
+        """Get usage metrics for the provider.
+        
+        Returns:
+            Dictionary containing usage metrics
+        """
+        return {
+            "total_tokens": self.total_tokens,
+            "total_cost": self.total_cost
+        } 

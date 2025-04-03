@@ -1,21 +1,61 @@
-from typing import Dict, Tuple
-from .environment import Environment
+"""Game state representation for Picobot."""
 
+from typing import Dict, Any, Set, Tuple
+from dataclasses import dataclass
+
+@dataclass
 class State:
-    """Class representing the current state of the Picobot game."""
+    """Represents the current state of the Picobot game."""
     
-    def __init__(self, environment: Environment, position: Tuple[int, int] = (0, 0)):
+    position: Tuple[int, int]  # Current (x, y) position
+    walls: Dict[str, bool]  # Dictionary of walls in each direction (N, E, W, S)
+    visited: Set[Tuple[int, int]]  # Set of visited positions
+    steps: int  # Number of steps taken
+    
+    def __init__(self, position: Tuple[int, int], walls: Dict[str, bool], visited: Set[Tuple[int, int]], steps: int = 0):
         """Initialize the game state.
         
         Args:
-            environment: The game environment
-            position: Initial position (x, y)
+            position: Current (x, y) position
+            walls: Dictionary of walls in each direction (N, E, W, S)
+            visited: Set of visited positions
+            steps: Number of steps taken
         """
-        self.environment = environment
         self.position = position
-        self.visited = set()
-        self.visited.add(position)
+        self.walls = walls
+        self.visited = visited
+        self.steps = steps
     
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert state to dictionary format.
+        
+        Returns:
+            Dictionary representation of the state
+        """
+        return {
+            "position": self.position,
+            "walls": self.walls,
+            "visited": list(self.visited),  # Convert set to list for serialization
+            "steps": self.steps
+        }
+    
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'State':
+        """Create a State instance from a dictionary.
+        
+        Args:
+            data: Dictionary containing state data
+            
+        Returns:
+            New State instance
+        """
+        return cls(
+            position=tuple(data["position"]),
+            walls=data["walls"],
+            visited=set(map(tuple, data["visited"])),  # Convert list back to set of tuples
+            steps=data["steps"]
+        )
+
     def get_surroundings(self) -> Dict[str, bool]:
         """Get the state of surrounding cells.
         
@@ -24,10 +64,10 @@ class State:
         """
         x, y = self.position
         return {
-            "North": self.environment.is_wall(x, y + 1),
-            "South": self.environment.is_wall(x, y - 1),
-            "East": self.environment.is_wall(x + 1, y),
-            "West": self.environment.is_wall(x - 1, y)
+            "North": self.walls["North"],
+            "South": self.walls["South"],
+            "East": self.walls["East"],
+            "West": self.walls["West"]
         }
     
     def can_move(self, direction: str) -> bool:
@@ -65,4 +105,5 @@ class State:
             self.position = (x - 1, y)
             
         self.visited.add(self.position)
+        self.steps += 1
         return True 

@@ -5,6 +5,7 @@ from openai import OpenAI
 from httpx import Timeout
 from ..base import LLMInterface, LLMResponse
 from ...config.llm_config import LLMConfig
+from ...game.state import State
 
 class OpenAIProvider(LLMInterface):
     """OpenAI implementation of the LLM interface."""
@@ -30,6 +31,9 @@ class OpenAIProvider(LLMInterface):
         )
         
         self.model_config = self.config.openai_models.get(model_name, {})
+        
+        # Add chat completions interface
+        self.chat = self.client.chat
     
     def initialize(self) -> None:
         """Initialize the OpenAI client."""
@@ -47,84 +51,51 @@ class OpenAIProvider(LLMInterface):
         except Exception as e:
             raise RuntimeError(f"Failed to initialize OpenAI client: {str(e)}")
     
-    def cleanup(self) -> None:
-        """Clean up OpenAI resources."""
-        pass
-    
-    def _format_state(self, current_state: Dict[str, Any], history: Optional[list] = None) -> str:
-        """Format the current game state into a prompt-friendly string."""
-        pos = current_state["position"]
-        walls = current_state["walls"]
-        visited = current_state["visited"]
-        steps = current_state["steps"]
-        
-        # Format walls
-        wall_str = "".join([
-            "N" if walls["N"] else "x",
-            "E" if walls["E"] else "x",
-            "W" if walls["W"] else "x",
-            "S" if walls["S"] else "x"
-        ])
-        
-        # Format history if available
-        history_str = ""
-        if history:
-            history_str = "\nPrevious moves:\n" + "\n".join([
-                f"- {move['move']}: {move['explanation']}"
-                for move in history[-3:]  # Only show last 3 moves
-            ])
-        
-        return f"""Current game state:
-Position: {pos}
-Walls: {wall_str}
-Visited cells: {len(visited)}
-Steps taken: {steps}{history_str}
-
-What should be the next move? Choose one of: N, E, W, S.
-Explain your reasoning and provide a confidence score (0-1).
-You must respond in JSON format with the following structure:
-{{"move": "N/E/W/S", "explanation": "your reasoning", "confidence": 0.0-1.0}}"""
-    
-    def get_move(self, 
-                current_state: Dict[str, Any],
-                history: Optional[list] = None) -> LLMResponse:
-        """
-        Get the next move from OpenAI's LLM.
+    def get_next_move(self, state: State) -> Dict[str, Any]:
+        """Get the next move from OpenAI's LLM.
         
         Args:
-            current_state: Current game state
-            history: Optional list of previous moves
-        
+            state: Current game state
+            
         Returns:
-            LLMResponse containing the move and explanation
+            Dictionary containing move, reasoning, and confidence
         """
-        prompt = self._format_state(current_state, history)
+        # Format the state for the prompt
+        state_desc = f"""Current Position: ({state.position[0]}, {state.position[1]})
+Walls: {state.walls}
+Visited Cells: {len(state.visited)}
+Total Steps: {state.steps}"""
         
         try:
-            # Use client with request-specific options
-            response = self.client.with_options(
-                timeout=self.config.timeout
-            ).chat.completions.create(
+            # Create the message with the prompt
+            response = self.client.chat.completions.create(
                 model=self.model_name,
                 messages=[
                     {
                         "role": "system",
-                        "content": "You are a Picobot playing agent. Your goal is to explore the environment efficiently. You must respond in JSON format with valid moves and clear explanations."
+                        "content": "You are a Picobot controller that always responds in valid JSON format with move, reasoning, and confidence fields."
                     },
                     {
                         "role": "user",
-                        "content": prompt
+                        "content": f"""You are controlling a Picobot in a grid-based environment. Your task is to navigate while avoiding walls and maximizing exploration.
+
+Current State:
+{state_desc}
+
+Please analyze the state and choose the next move. Respond in JSON format with:
+- move: The chosen direction (N/E/W/S)
+- reasoning: Your explanation for the choice
+- confidence: Your confidence in the move (0.0 to 1.0)"""
                     }
                 ],
                 temperature=self.temperature,
                 max_tokens=self.model_config.get("max_tokens", 1000),
-                response_format={"type": "json_object"},  # Ensure JSON response
-                seed=42  # For reproducibility
+                response_format={"type": "json_object"}
             )
             
+            # Parse the response
             content = response.choices[0].message.content
             try:
-                # Try to parse as JSON first
                 move_data = json.loads(content)
             except json.JSONDecodeError as e:
                 raise ValueError(f"Failed to parse JSON response: {str(e)}")
@@ -135,14 +106,18 @@ You must respond in JSON format with the following structure:
             
             # Update metrics
             self.total_tokens += response.usage.total_tokens
-            cost_per_1k = self.model_config.get("cost_per_1k_tokens", 0.03)
-            self.total_cost += (response.usage.total_tokens / 1000) * cost_per_1k
+            self.total_cost += (response.usage.total_tokens / 1000) * self.model_config.get("cost_per_1k_tokens", 0.002)
             
-            return LLMResponse(
-                move=move_data["move"],
-                explanation=move_data["explanation"],
-                confidence=float(move_data.get("confidence", 0.5))
-            )
+            return {
+                "move": move_data["move"],
+                "reasoning": move_data["reasoning"],
+                "confidence": move_data["confidence"]
+            }
             
         except Exception as e:
-            raise RuntimeError(f"Error getting move from OpenAI: {str(e)}") 
+            raise RuntimeError(f"Failed to get move from OpenAI: {str(e)}")
+    
+    def cleanup(self) -> None:
+        """Clean up any resources used by the provider."""
+        # OpenAI client doesn't need cleanup
+        pass 

@@ -1,50 +1,22 @@
-# Picobot
+# Picobot LLM Integration
 
-A modern Python 3 implementation of Picobot, a robot that learns to explore its environment using either genetic algorithms or Large Language Models (LLMs). This is a recreation of a classic educational game that demonstrates programming concepts, evolutionary algorithms, and AI-driven decision making.
+An exploration of using Large Language Models to control and generate rules for Picobot, the classic robot programming game.
 
 ## Overview
 
-Picobot is a simple robot that moves around in a grid world, trying to explore as much of the space as possible. The robot can follow either a set of rules (program) that determine its movement based on its current state and the pattern of walls around it, or use an LLM to make intelligent decisions about its movement.
+This project investigates how modern LLMs handle the challenge of generating and executing Picobot rules. We've implemented three modes of operation:
 
-### Key Features
+1. **Classic Mode**: Traditional rule-based Picobot
+2. **Evolution Mode**: Genetic algorithm for rule generation
+3. **LLM Mode**: AI language model control and rule generation
 
-- **Grid-based Environment**: A 20x20 grid with walls on all sides
-- **Multiple Control Methods**:
-  - **State Machine**: Programs use up to 5 states to control robot behavior
-  - **LLM-based Control**: Uses OpenAI's GPT models or Anthropic's Claude for intelligent decision making
-- **Pattern Matching**: Robot responds to patterns of walls in its immediate vicinity
-- **Genetic Algorithm**: Evolves programs to find optimal exploration strategies
-- **Modern Visualization**: Real-time visualization using Pygame
-- **Type Hints**: Full Python type annotations for better code clarity
-- **Modular Design**: Clean separation of game logic, visualization, evolution, and LLM integration
+## Features
 
-### How It Works
-
-1. **Program Structure** (Genetic Algorithm Mode):
-   - Each program consists of rules mapping (state, pattern) → (move, next_state)
-   - States are numbers from 0 to 4 (MAX_STATES - 1)
-   - Patterns represent walls around the robot (e.g., "Nxxx" means a wall to the north)
-   - Moves are one of ["N", "E", "W", "S"]
-
-2. **LLM-based Control**:
-   - Supports multiple LLM providers (OpenAI GPT and Anthropic Claude)
-   - Uses structured JSON responses for consistent move generation
-   - Provides context about current state and environment
-   - Includes confidence scoring and reasoning for each move
-   - Handles wall avoidance and exploration optimization
-
-3. **Genetic Algorithm**:
-   - Creates a population of random programs
-   - Evaluates fitness by running multiple trials from random starting positions
-   - Selects top programs for reproduction
-   - Creates new programs through crossover and mutation
-   - Repeats for multiple generations
-
-4. **Visualization**:
-   - Green square: Current robot position
-   - Gray squares: Visited cells
-   - Blue squares: Walls
-   - White squares: Unvisited cells
+- Integration with multiple LLM providers (OpenAI, Anthropic)
+- Real-time visualization of robot movement
+- Rule generation and validation
+- Coverage analysis and metrics
+- Evolution-based optimization
 
 ## Installation
 
@@ -74,119 +46,44 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here  # Optional
 
 ## Usage
 
-### Running with a Random Program (Genetic Algorithm Mode)
-
-To run the game with a random program:
+### Classic Mode
 ```bash
-python -m picobot
+python -m picobot --classic
 ```
 
-This will:
-1. Generate a random program
-2. Display the program's rules
-3. Show a visualization of the robot exploring the environment
-
-### Running with LLM Control
-
-To run the game with LLM-based control:
+### Evolution Mode
 ```bash
-python -m picobot --llm
+python -m picobot --evolve --population 100 --generations 50 --steps 500
 ```
 
-This will:
-1. Initialize the LLM provider (OpenAI by default)
-2. Use the LLM to make movement decisions
-3. Show a visualization of the robot exploring the environment
-
-#### LLM Options
-- `--model`: Specify the LLM model to use (default: "gpt-3.5-turbo" or "claude-3-7-sonnet-20250219")
-- `--temperature`: Set the temperature for LLM responses (default: 0.7)
-- `--provider`: Choose the LLM provider ("openai" or "anthropic")
-
-### Evolving a Program
-
-To evolve a program using genetic algorithms:
+### LLM Mode
 ```bash
-python -m picobot --evolve
+# Using OpenAI
+python -m picobot --llm --provider openai --model gpt-3.5-turbo --steps 100
+
+# Using Anthropic
+python -m picobot --llm --provider anthropic --model claude-3-opus-20240229 --steps 100
 ```
 
-#### Command Line Options
+## Documentation
 
-- `--evolve`: Enable evolution mode
-- `--population`: Population size for evolution (default: 100)
-- `--generations`: Number of generations to evolve (default: 50)
-- `--steps`: Number of steps to run visualization (default: 500)
+See the [docs](docs/) directory for detailed documentation:
+- [Classic Mode Demo](docs/classic_mode_demo.md)
+- [Evolution Mode Demo](docs/evolution_mode_demo.md)
+- [LLM Mode Demo](docs/llm_mode_demo.md)
+- [LLM Presentation Demo](docs/llm_presentation_demo.md)
 
-#### Example Usage
+## Current Status
 
-Run with Anthropic's Claude:
-```bash
-python -m picobot --llm --provider anthropic --model claude-3-7-sonnet-20250219
-```
-
-Run with OpenAI's GPT-4:
-```bash
-python -m picobot --llm --provider openai --model gpt-4
-```
-
-Run evolution with larger population and more generations:
-```bash
-python -m picobot --evolve --population 200 --generations 100
-```
-
-Run with more steps to see longer exploration:
-```bash
-python -m picobot --evolve --steps 1000
-```
-
-### Controls
-
-- Press ESC to exit the visualization
-- Close the window to stop the program
-
-## Configuration
-
-### Genetic Algorithm Parameters
-
-The evolution process can be tuned using these parameters in `constants.py`:
-
-- `MAX_STATES`: Maximum number of states in a program (default: 5)
-- `TRIALS`: Number of trials to evaluate each program (default: 20)
-- `STEPS`: Number of steps per trial (default: 800)
-- `MUTATION_RATE`: Probability of mutation (default: 0.02)
-- `TOP_FRACTION`: Fraction of population selected for reproduction (default: 0.2)
-
-### LLM Configuration
-
-LLM settings can be configured in `config/llm_config.py`:
-
-- Model selection and parameters
-- API timeouts and retry settings
-- Cost tracking and token limits
-- Provider-specific settings
-
-## Project Structure
-
-```
-picobot/
-├── __main__.py      # Main entry point
-├── constants.py     # Game configuration
-├── program.py       # Program class and rules
-├── robot.py         # Picobot and environment
-├── visualizer.py    # Pygame visualization
-├── evolution.py     # Genetic algorithm
-├── config/         # Configuration files
-│   └── llm_config.py  # LLM settings
-└── llm/            # LLM integration
-    ├── base.py     # Base LLM interface
-    └── providers/  # LLM providers
-        ├── openai.py    # OpenAI implementation
-        └── anthropic.py # Anthropic implementation
-```
+The project is actively exploring LLM integration challenges, particularly:
+- Pattern format adherence
+- Rule generation completeness
+- Strategic decision making
+- Hybrid approaches with evolution
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 ## License
 

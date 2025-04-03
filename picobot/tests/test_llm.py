@@ -3,6 +3,7 @@ from typing import Dict, Any, Set, Tuple
 from ..llm.providers import OpenAIProvider
 from ..config.llm_config import LLMConfig
 from dotenv import load_dotenv
+from ..game.state import State  # Add State import
 
 # Add debugging information
 print("Current working directory:", os.getcwd())
@@ -91,19 +92,25 @@ def main():
         # Run for a few steps
         for _ in range(10):
             # Get current state
-            state = bot.get_state()
+            state_dict = bot.get_state()
+            state = State(
+                position=state_dict["position"],
+                walls=state_dict["walls"],
+                visited=state_dict["visited"],
+                steps=state_dict["steps"]
+            )
             print("\n" + "="*50)
             bot.print_state()
             
             # Get move from LLM
-            response = provider.get_move(state)
+            response = provider.get_next_move(state)
             print(f"\nLLM Response:")
-            print(f"Move: {response.move}")
-            print(f"Explanation: {response.explanation}")
-            print(f"Confidence: {response.confidence}")
+            print(f"Move: {response['move']}")
+            print(f"Explanation: {response['reasoning']}")
+            print(f"Confidence: {response['confidence']}")
             
             # Execute move
-            success = bot.move(response.move)
+            success = bot.move(response['move'])
             if not success:
                 print("Move failed - hit a wall!")
             

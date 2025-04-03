@@ -1,4 +1,5 @@
-from .environment import Environment
+"""Game package for Picobot."""
+
 from .state import State
 
-__all__ = ['Environment', 'State'] 
+__all__ = ['State'] 

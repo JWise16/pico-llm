@@ -1,4 +1,62 @@
-# Picobot Development Roadmap
+# Project Roadmap
+
+## Current Focus: LLM Integration Challenges
+
+### Immediate Goals
+1. Improve rule generation reliability
+   - Better pattern format adherence
+   - More complete rule coverage
+   - Strategic state transitions
+
+2. Enhance LLM understanding
+   - Better prompt engineering
+   - Improved context provision
+   - More sophisticated strategy generation
+
+3. Hybrid approaches
+   - Combine LLM strategy with evolution
+   - Use LLMs to optimize evolution parameters
+   - Learn from successful evolution-generated rules
+
+### Technical Improvements
+1. Rule validation
+   - More robust pattern parsing
+   - Better error handling
+   - Improved default rule generation
+
+2. LLM integration
+   - Enhanced provider support
+   - Better response parsing
+   - Improved error recovery
+
+3. Performance optimization
+   - Faster rule generation
+   - More efficient validation
+   - Better memory usage
+
+## Future Exploration
+
+### Potential Directions
+1. Multi-model collaboration
+   - Different LLMs for different aspects
+   - Model comparison and analysis
+   - Ensemble approaches
+
+2. Advanced strategies
+   - Complex state machines
+   - Dynamic rule adaptation
+   - Learning from experience
+
+3. Visualization enhancements
+   - Rule visualization
+   - Strategy explanation
+   - Performance metrics
+
+### Research Questions
+1. How do different LLMs approach the Picobot challenge?
+2. What makes rule format adherence difficult for LLMs?
+3. Can we leverage LLMs' strategic understanding better?
+4. How can we combine LLM and evolution approaches effectively?
 
 ## Phase 1: Core Stability and Testing (Current)
 - [x] Implement basic robot movement and environment
