@@ -10,6 +10,7 @@ from .llm.providers.openai import OpenAIProvider
 from .llm.providers.anthropic import AnthropicProvider
 from .config.llm_config import LLMConfig
 from .llm.rule_generator import generate_rules
+from .llm.prompts import AVAILABLE_PROMPTS
 
 def main():
     """Main entry point for the Picobot game."""
@@ -20,6 +21,8 @@ def main():
                       help="LLM provider to use (default: openai)")
     parser.add_argument("--model", type=str, default="gpt-3.5-turbo",
                       help="Model to use (default: gpt-3.5-turbo)")
+    parser.add_argument("--prompt", type=str, choices=list(AVAILABLE_PROMPTS.keys()), default="basic",
+                      help="Prompt strategy to use (default: basic)")
     parser.add_argument("--population", type=int, default=100, help="Population size for evolution")
     parser.add_argument("--generations", type=int, default=50, help="Number of generations to evolve")
     parser.add_argument("--steps", type=int, default=500, help="Number of steps to run visualization")
@@ -36,8 +39,8 @@ def main():
         provider.initialize()
         
         try:
-            print(f"\nGenerating rules using {args.provider} ({args.model})...")
-            program = generate_rules(provider)
+            print(f"\nGenerating rules using {args.provider} ({args.model}) with {args.prompt} prompt...")
+            program = generate_rules(provider, prompt_name=args.prompt)
             print("\nGenerated Rules:")
             print(program)
             

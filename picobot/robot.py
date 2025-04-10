@@ -72,6 +72,13 @@ class Picobot:
         # Get the move and next state from the program
         move, self.state = self.program.get_move(self.state, pattern)
         
+        # Check if the move would take the robot out of bounds
+        if (move == "N" and self.robot_row == 0) or \
+           (move == "S" and self.robot_row == ROWS - 1) or \
+           (move == "E" and self.robot_col == COLUMNS - 1) or \
+           (move == "W" and self.robot_col == 0):
+            return False
+        
         # Update robot position based on move
         if move == "N":
             self.robot_row -= 1

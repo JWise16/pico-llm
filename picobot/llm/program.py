@@ -4,6 +4,7 @@ from typing import Tuple, Dict, Any, Set
 from ..program import Program
 from .base import LLMInterface
 from ..game.state import State
+from ..constants import ROWS, COLUMNS
 
 class LLMProgram(Program):
     """Program that uses an LLM provider for decision making."""
@@ -51,6 +52,63 @@ class LLMProgram(Program):
             move = "W"
         else:
             raise ValueError(f"Invalid move from LLM: {move}")
+        
+        # Check if the move would hit a wall
+        if "N" in pattern and move == "N":
+            # Try moving east if possible
+            if "E" not in pattern:
+                return "E", self.current_state
+            # Try moving west if possible
+            elif "W" not in pattern:
+                return "W", self.current_state
+            # Try moving south if possible
+            elif "S" not in pattern:
+                return "S", self.current_state
+            # No valid moves, stay in place
+            else:
+                return "N", self.current_state
+                
+        elif "S" in pattern and move == "S":
+            # Try moving east if possible
+            if "E" not in pattern:
+                return "E", self.current_state
+            # Try moving west if possible
+            elif "W" not in pattern:
+                return "W", self.current_state
+            # Try moving north if possible
+            elif "N" not in pattern:
+                return "N", self.current_state
+            # No valid moves, stay in place
+            else:
+                return "S", self.current_state
+                
+        elif "E" in pattern and move == "E":
+            # Try moving north if possible
+            if "N" not in pattern:
+                return "N", self.current_state
+            # Try moving south if possible
+            elif "S" not in pattern:
+                return "S", self.current_state
+            # Try moving west if possible
+            elif "W" not in pattern:
+                return "W", self.current_state
+            # No valid moves, stay in place
+            else:
+                return "E", self.current_state
+                
+        elif "W" in pattern and move == "W":
+            # Try moving north if possible
+            if "N" not in pattern:
+                return "N", self.current_state
+            # Try moving south if possible
+            elif "S" not in pattern:
+                return "S", self.current_state
+            # Try moving east if possible
+            elif "E" not in pattern:
+                return "E", self.current_state
+            # No valid moves, stay in place
+            else:
+                return "W", self.current_state
         
         return move, self.current_state
     

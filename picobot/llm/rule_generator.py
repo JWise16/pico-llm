@@ -6,11 +6,12 @@ from ..program import Program
 from ..constants import VALID_PATTERNS, MAX_STATES
 import json
 
-def generate_rules(provider: LLMInterface) -> Program:
+def generate_rules(provider: LLMInterface, prompt_name: str = 'basic') -> Program:
     """Generate a complete set of Picobot rules using an LLM provider.
     
     Args:
         provider: The LLM provider to use for rule generation
+        prompt_name: Name of the prompt to use (default: 'basic')
         
     Returns:
         Program object with the generated rules
@@ -18,7 +19,7 @@ def generate_rules(provider: LLMInterface) -> Program:
     try:
         # Get rules from LLM
         print("\nRequesting rules from LLM...")
-        rules = provider.generate_rules()
+        rules = provider.generate_rules(prompt_name=prompt_name)
         
         # Log the raw rules
         print("\nRaw rules received from LLM:")
