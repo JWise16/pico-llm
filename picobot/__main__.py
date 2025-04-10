@@ -27,11 +27,10 @@ def main():
     
     if args.llm:
         # Initialize LLM provider
-        config = LLMConfig()
         if args.provider == "openai":
-            provider = OpenAIProvider(args.model, temperature=0.7, config=config)
+            provider = OpenAIProvider(model_name=args.model)
         else:
-            provider = AnthropicProvider(args.model, temperature=0.7)
+            provider = AnthropicProvider(model_name=args.model)
         
         # Initialize the provider
         provider.initialize()
@@ -52,10 +51,10 @@ def main():
             visualizer.run(picobot, args.steps)
             
             # Print metrics
-            metrics = provider.get_metrics()
+            metrics = provider.get_usage_metrics()
             print("\nLLM Metrics:")
             print(f"Total tokens used: {metrics['total_tokens']}")
-            print(f"Total cost: ${metrics['total_cost']:.4f}")
+            print(f"Total cost: ${metrics['cost']:.4f}")
             
         finally:
             # Cleanup

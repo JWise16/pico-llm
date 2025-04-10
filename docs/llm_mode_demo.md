@@ -2,13 +2,11 @@
 
 ## LLM Mode Documentation
 
-The LLM (Large Language Model) mode allows Picobot to be controlled by an AI language model, either for real-time decision making or rule generation. This mode is currently in development and has some known limitations.
+The LLM (Large Language Model) mode allows Picobot to be controlled by an AI language model by generating a complete set of rules for autonomous operation. This mode is currently in development and has some known limitations.
 
 ### Overview
 
-The LLM mode can operate in two ways:
-1. Real-time control: The LLM makes decisions about each move based on the current state
-2. Rule generation: The LLM generates a complete set of rules for autonomous operation
+The LLM mode generates a complete set of rules upfront, similar to the classic mode, but using an AI language model to create the rules. The generated rules are then used by the Picobot simulator without further LLM intervention.
 
 ### Usage
 
@@ -39,19 +37,19 @@ The LLM integration consists of:
 - Provider implementations (OpenAI, Anthropic)
 - Rule generator for converting LLM output to Picobot rules
 
-#### State Representation
+#### Rule Generation Process
 
-The LLM receives:
-- Current position (x, y)
-- Surrounding walls (North, South, East, West)
-- Visited positions
-- Current state number
+1. The LLM receives a detailed prompt explaining the rule format and requirements
+2. It generates a complete set of rules in JSON format
+3. The rules are parsed and validated
+4. Any missing rules are automatically filled with default behaviors
+5. The complete rule set is used by the Picobot simulator
 
 ### Known Issues and Limitations
 
 #### Rule Generation
 
-1. **Format Compliance**: The LLM currently struggles to consistently generate rules in the exact required format:
+1. **Format Compliance**: The LLM sometimes struggles to consistently generate rules in the exact required format:
    - Rules should be: `STATE PATTERN -> MOVE NEXT_STATE`
    - Example: `0 NExx -> W 1`
 
@@ -62,18 +60,38 @@ The LLM receives:
 
 3. **Coverage**: The rule generator often fails to provide rules for all possible state-pattern combinations, requiring default rules to be added automatically.
 
-#### Real-time Control
+#### Token Limits and Response Handling
 
-1. **Response Format**: The LLM sometimes generates responses that don't strictly follow the required JSON format.
-2. **Decision Consistency**: Move decisions may not always follow a coherent strategy across multiple steps.
+The LLM providers are configured with generous token limits (4000 tokens) to accommodate large rule sets. However, in some cases, responses may still be truncated. The system includes several mechanisms to handle this:
+
+1. **Partial Rule Salvaging**: If a response is truncated, the system will attempt to:
+   - Identify the last complete rule in the truncated response
+   - Reconstruct a valid JSON structure
+   - Parse and use the salvaged rules
+
+2. **Debugging Information**: When issues occur, the system provides detailed logging:
+   - Raw LLM response
+   - Parsed JSON data
+   - Any salvage attempts and results
+   - Specific rule parsing failures
+
+3. **Token Usage Tracking**: The system tracks token usage for each provider:
+   - OpenAI: Tracks input and output tokens separately
+   - Anthropic: Tracks total token usage
+   - Cost estimates are calculated based on provider-specific rates
+
+If you encounter token limit issues:
+1. Check the debug output for the raw response and parsing attempts
+2. Consider reducing the number of rules requested if consistently hitting limits
+3. Monitor token usage patterns to optimize prompt engineering
 
 ### Future Improvements
 
 Planned enhancements:
 1. Improved prompt engineering for more reliable rule generation
 2. Better validation and error handling for LLM responses
-3. Implementation of a hybrid approach combining pre-generated rules with real-time adjustments
-4. Enhanced state machine design for more sophisticated exploration strategies
+3. Enhanced state machine design for more sophisticated exploration strategies
+4. Hybrid approaches combining LLM-generated rules with evolution-based optimization
 
 ### Examples
 
@@ -110,7 +128,137 @@ To improve the LLM mode:
 4. Add support for new LLM providers
 
 ## Overview
-The LLM (Large Language Model) mode demonstrates how artificial intelligence can be used to generate and control Picobot's behavior. This mode uses advanced language models to create exploration strategies and control the robot's movements.
+
+The LLM mode in Picobot demonstrates how large language models can be used to generate a complete set of rules for autonomous operation. Unlike the classic and evolution modes, which rely on predefined rules or genetic algorithms, the LLM mode leverages the capabilities of advanced language models to generate a comprehensive rule set that can be used by the robot to navigate its environment.
+
+## How It Works
+
+1. **Rule Generation**: The LLM is prompted to generate a complete set of rules for Picobot, following a specific format and addressing all possible wall patterns for each state.
+
+2. **Rule Parsing**: The generated rules are parsed from the LLM's response, with robust error handling for various response formats and potential issues.
+
+3. **Rule Validation**: The parsed rules are validated to ensure they follow the correct format and cover all necessary patterns.
+
+4. **Rule Application**: The validated rules are applied to the robot, which then operates autonomously based on these rules.
+
+## Token Limits and Response Handling
+
+The LLM mode includes robust handling of token limits and response issues:
+
+1. **Increased Token Limits**: Both OpenAI and Anthropic providers are configured with higher token limits (4000 tokens) to accommodate the generation of complete rule sets.
+
+2. **Timeout Handling**: If a request times out, the system will automatically retry with a smaller token limit (2000 tokens) to improve the chances of a successful response.
+
+3. **Partial Rule Salvaging**: If the response is truncated or malformed, the system attempts to salvage partial rules from the response, using multiple strategies:
+   - Finding the last complete rule in the truncated response
+   - Extracting individual rules using regex patterns
+   - Attempting to parse incomplete JSON structures
+
+4. **Debugging Information**: Detailed logging is provided throughout the process, including:
+   - Raw LLM responses
+   - Parsed JSON data
+   - Extracted rules
+   - Any errors encountered during parsing or extraction
+
+5. **Token Usage Tracking**: The system tracks token usage and associated costs for each provider.
+
+## Known Issues and Limitations
+
+1. **Format Compliance**: LLMs may sometimes generate rules that don't strictly follow the required format, such as using wildcards instead of the required characters or adding unnecessary spaces.
+
+2. **Coverage Challenges**: Ensuring complete coverage of all wall patterns for each state can be challenging, as LLMs may prioritize certain patterns over others.
+
+3. **Response Reliability**: LLM responses can be unpredictable, with occasional timeouts or malformed outputs that require the salvage mechanisms to recover.
+
+4. **Token Limits**: Even with increased token limits, very large rule sets may still exceed the limits, requiring the system to fall back to smaller limits or partial rule sets.
+
+## Future Improvements
+
+1. **Better Prompt Engineering**: Refining the prompts to encourage more consistent and complete rule generation.
+
+2. **Validation Strategies**: Implementing more sophisticated validation to ensure rule completeness and correctness.
+
+3. **Hybrid Approaches**: Combining LLM-generated rules with evolution-based optimization to improve performance.
+
+4. **Improved Error Recovery**: Enhancing the salvage mechanisms to handle more edge cases and recover more rules from problematic responses.
+
+## Example Output
+
+Here's an example of the current rule generation output:
+
+```
+Raw LLM Response:
+{
+  "rules": [
+    {"state": 0, "pattern": "xxxx", "move": "N", "next_state": 1},
+    {"state": 0, "pattern": "Nxxx", "move": "E", "next_state": 0},
+    {"state": 0, "pattern": "NExx", "move": "S", "next_state": 0},
+    {"state": 0, "pattern": "NxWx", "move": "E", "next_state": 0},
+    {"state": 0, "pattern": "xxxS", "move": "N", "next_state": 0},
+    {"state": 0, "pattern": "xExS", "move": "N", "next_state": 0},
+    {"state": 0, "pattern": "xxWS", "move": "N", "next_state": 0},
+    {"state": 0, "pattern": "xExx", "move": "N", "next_state": 0},
+    {"state": 0, "pattern": "xxWx", "move": "N", "next_state": 0},
+    {"state": 1, "pattern": "xxxx", "move": "E", "next_state": 2},
+    {"state": 1, "pattern": "Nxxx", "move": "E", "next_state": 1},
+    {"state": 1, "pattern": "NExx", "move": "S", "next_state": 1},
+    {"state": 1, "pattern": "NxWx", "move": "E", "next_state": 1},
+    {"state": 1, "pattern": "xxxS", "move": "E", "next_state": 1},
+    {"state": 1, "pattern": "xExS", "move": "N", "next_state": 1},
+    {"state": 1, "pattern": "xxWS", "move": "E", "next_state": 1},
+    {"state": 1, "pattern": "xExx", "move": "E", "next_state": 1},
+    {"state": 1, "pattern": "xxWx", "move": "E", "next_state": 1},
+    {"state": 2, "pattern": "xxxx", "move": "S", "next_state": 3},
+    {"state": 2, "pattern": "Nxxx", "move": "S", "next_state": 2},
+    {"state": 2, "pattern": "NExx", "move": "S", "next_state": 2},
+    {"state": 2, "pattern": "NxWx", "move": "S", "next_state": 2},
+    {"state": 2, "pattern": "xxxS", "move": "W", "next_state": 2},
+    {"state": 2, "pattern": "xExS", "move": "W", "next_state": 2},
+    {"state": 2, "pattern": "xxWS", "move": "W", "next_state": 2},
+    {"state": 2, "pattern": "xExx", "move": "S", "next_state": 2},
+    {"state": 2, "pattern": "xxWx", "move": "S", "next_state": 2},
+    {"state": 3, "pattern": "xxxx", "move": "W", "next_state": 4},
+    {"state": 3, "pattern": "Nxxx", "move": "W", "next_state": 3},
+    {"state": 3, "pattern": "NExx", "move": "W", "next_state": 3},
+    {"state": 3, "pattern": "NxWx", "move": "W", "next_state": 3},
+    {"state": 3, "pattern": "xxxS", "move": "W", "next_state": 3},
+    {"state": 3, "pattern": "xExS", "move": "W", "next_state": 3},
+    {"state": 3, "pattern": "xxWS", "move": "W", "next_state": 3},
+    {"state": 3, "pattern": "xExx", "move": "W", "next_state": 3},
+    {"state": 3, "pattern": "xxWx", "move": "W", "next_state": 3},
+    {"state": 4, "pattern": "xxxx", "move": "N", "next_state": 0},
+    {"state": 4, "pattern": "Nxxx", "move": "E", "next_state": 4},
+    {"state": 4, "pattern": "NExx", "move": "S", "next_state": 4},
+    {"state": 4, "pattern": "NxWx", "move": "E", "next_state": 4},
+    {"state": 4, "pattern": "xxxS", "move": "N", "next_state": 4},
+    {"state": 4, "pattern": "xExS", "move": "N", "next_state": 4},
+    {"state": 4, "pattern": "xxWS", "move": "N", "next_state": 4},
+    {"state": 4, "pattern": "xExx", "move": "N", "next_state": 4},
+    {"state": 4, "pattern": "xxWx", "move": "N", "next_state": 4}
+  ]
+}
+```
+
+## Troubleshooting
+
+If you encounter issues with the LLM mode, here are some common problems and solutions:
+
+1. **Timeout Errors**: If you see timeout errors, the system will automatically retry with a smaller token limit. If this still fails, try:
+   - Checking your internet connection
+   - Reducing the complexity of the prompt
+   - Using a different model (e.g., switching from GPT-4 to GPT-3.5-Turbo)
+
+2. **Malformed Responses**: If the LLM generates malformed responses, the system will attempt to salvage partial rules. Check the debug output to see what rules were successfully extracted.
+
+3. **Incomplete Rule Sets**: If the generated rule set is incomplete, you may need to:
+   - Adjust the prompt to emphasize completeness
+   - Increase the token limit (if not already at maximum)
+   - Consider using a more capable model
+
+4. **Token Limit Issues**: If you consistently hit token limits:
+   - Check the debug output to see the token usage
+   - Consider reducing the number of rules requested
+   - Look for patterns in the token usage to identify potential optimizations
 
 ## Running LLM Mode
 To run Picobot in LLM mode, use the following command:
@@ -131,18 +279,19 @@ The LLM generates a complete set of rules for Picobot using the following proces
 2. It generates rules that cover all possible wall patterns and states
 3. The rules are parsed and validated
 4. Any missing rules are automatically filled with default behaviors
+5. The complete rule set is used by the Picobot simulator
 
 ### Rule Format
-Each rule follows the format: `PATTERN STATE->MOVE NEWSTATE`
-- `PATTERN`: 4-character string representing walls (N, E, S, W, x)
+Each rule follows the format: `STATE PATTERN -> MOVE NEXT_STATE`
 - `STATE`: Current state (0-4)
+- `PATTERN`: 4-character string representing walls (N, E, S, W, x)
 - `MOVE`: Direction to move (N, E, S, W)
-- `NEWSTATE`: Next state (0-4)
+- `NEXT_STATE`: Next state (0-4)
 
 Example rules:
 ```
-NExx 0->W 4
-NxWx 0->E 0
+0 NExx -> W 4
+0 NxWx -> E 0
 ```
 
 ### State Machine Design
@@ -214,10 +363,10 @@ The LLM typically creates a state machine with the following structure:
 
 ### Sample Rule Set
 ```
-NExx 0->W 4    # North-east corner, move west to state 4
-NxWx 0->E 0    # North-west wall, move east staying in state 0
-xExx 1->S 2    # East wall, move south to state 2
-xxSx 2->W 1    # South wall, move west to state 1
+0 NExx -> W 4    # North-east corner, move west to state 4
+0 NxWx -> E 0    # North-west wall, move east staying in state 0
+1 xExx -> S 2    # East wall, move south to state 2
+2 xxSx -> W 1    # South wall, move west to state 1
 ```
 
 This rule set demonstrates:

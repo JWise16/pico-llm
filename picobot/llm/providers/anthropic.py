@@ -1,182 +1,176 @@
-import os
-from typing import Dict, Any
-import anthropic
-from ..base import LLMInterface
-from ...game.state import State
+"""Anthropic provider for Picobot LLM integration."""
+
+import json
+import re
+from typing import List, Dict, Any, Optional
+from anthropic import Anthropic
+from picobot.llm.base import LLMInterface, Rule
+from picobot.llm.prompts import get_prompt
 
 class AnthropicProvider(LLMInterface):
-    """Implementation of LLMInterface using Anthropic's Claude model."""
+    """Provider implementation for Anthropic models."""
     
-    def __init__(
-        self,
-        model: str = "claude-3-7-sonnet-20250219",
-        temperature: float = 0.7,
-        max_tokens: int = 1000
-    ):
+    def __init__(self, model_name: str = "claude-3-opus-20240229", temperature: float = 0.7):
         """Initialize the Anthropic provider.
         
         Args:
-            model: The Claude model to use
-            temperature: Temperature for response generation (0.0 to 1.0)
-            max_tokens: Maximum tokens in the response
+            model_name: Name of the Anthropic model to use
+            temperature: Temperature setting for generation
         """
-        self.model = model
-        self.temperature = temperature
-        self.max_tokens = max_tokens
+        super().__init__(model_name, temperature)
         self.client = None
-        self.total_tokens = 0
-        self.total_cost = 0.0
-        self.initialize()
-    
-    def initialize(self) -> None:
-        """Initialize the Anthropic client."""
-        api_key = os.getenv("ANTHROPIC_API_KEY")
-        if not api_key:
-            raise RuntimeError("ANTHROPIC_API_KEY environment variable not set")
+        self.model_config = {
+            "claude-3-opus-20240229": {
+                "max_tokens": 4000,
+                "cost_per_1k_tokens": 0.15
+            },
+            "claude-3-sonnet-20240229": {
+                "max_tokens": 4000,
+                "cost_per_1k_tokens": 0.03
+            }
+        }
+        self._usage_metrics = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "cost": 0.0
+        }
         
+    def initialize(self, api_key: Optional[str] = None) -> None:
+        """Initialize the Anthropic client.
+        
+        Args:
+            api_key: Optional API key to use. If not provided, will use environment variable.
+        """
         try:
-            # Initialize with just the API key
-            self.client = anthropic.Anthropic(api_key=api_key)
-            # Test the connection with a simple request
+            self.client = Anthropic(api_key=api_key)
+            # Test connection with a simple request
             self.client.messages.create(
-                model=self.model,
-                max_tokens=10,
-                messages=[{
-                    "role": "user",
-                    "content": "Test connection. Respond in JSON format."
-                }]
+                model=self.model_name,
+                max_tokens=5,
+                messages=[{"role": "user", "content": "test"}]
             )
         except Exception as e:
-            raise RuntimeError(f"Failed to initialize Anthropic client: {str(e)}")
-    
-    def _format_state(self, state: State) -> str:
-        """Format the game state for the prompt.
+            raise ConnectionError(f"Failed to initialize Anthropic client: {str(e)}")
+            
+    def generate_rules(self, prompt_name: str = 'basic', num_rules: int = 9) -> List[Rule]:
+        """Generate rules using the Anthropic model.
         
         Args:
-            state: Current game state
+            prompt_name: Name of the prompt to use
+            num_rules: Number of rules to generate
             
         Returns:
-            Formatted state description
-        """
-        # Get the current position and surroundings
-        x, y = state.position
-        surroundings = state.get_surroundings()
-        
-        # Format the state description
-        state_desc = f"""
-Current Position: ({x}, {y})
-Surroundings:
-- North: {'Wall' if surroundings['North'] else 'Empty'}
-- South: {'Wall' if surroundings['South'] else 'Empty'}
-- East: {'Wall' if surroundings['East'] else 'Empty'}
-- West: {'Wall' if surroundings['West'] else 'Empty'}
-"""
-        return state_desc
-    
-    def get_next_move(self, state: State) -> Dict[str, Any]:
-        """Get the next move from the LLM.
-        
-        Args:
-            state: Current game state
+            List of generated rules
             
-        Returns:
-            Dictionary containing move, reasoning, and confidence
+        Raises:
+            ValueError: If the prompt name is invalid
+            ConnectionError: If there are API connection issues
         """
         if not self.client:
-            self.initialize()
-        
-        # Format the state and create the prompt
-        state_desc = self._format_state(state)
-        
+            raise ConnectionError("Anthropic client not initialized")
+            
         try:
-            # Create the message with the prompt
-            message = self.client.messages.create(
-                model=self.model,
-                max_tokens=self.max_tokens,
+            # Get prompt and format it
+            prompt = get_prompt(prompt_name)
+            prompt = prompt.format(num_rules=num_rules)
+            
+            # Get model config
+            model_config = self.model_config.get(self.model_name, {
+                "max_tokens": 4000,
+                "cost_per_1k_tokens": 0.15
+            })
+            
+            # Generate response
+            response = self.client.messages.create(
+                model=self.model_name,
+                max_tokens=model_config["max_tokens"],
                 temperature=self.temperature,
-                system="You are a Picobot controller that always responds in valid JSON format with move, reasoning, and confidence fields. When generating rules, create a sophisticated state machine that uses different states for different exploration strategies.",
-                messages=[
-                    {
-                        "role": "user",
-                        "content": f"""You are controlling a Picobot in a grid-based environment. Your task is to navigate while avoiding walls and maximizing exploration.
-
-Current State:
-{state_desc}
-
-Please analyze the state and choose the next move. Respond in JSON format with:
-- move: The chosen direction (North/South/East/West)
-- reasoning: Your explanation for the choice
-- confidence: Your confidence in the move (0.0 to 1.0)
-
-If you see a prompt about generating rules, please provide a complete set of rules in your reasoning field. The rules should use states strategically:
-- State 0: Basic wall following (clockwise)
-- State 1: Corner handling and direction changes
-- State 2: Backtracking from dead ends
-- State 3: Counter-clockwise wall following
-- State 4: Special case handling for unexplored areas
-
-Make sure to include state transitions that create an effective exploration pattern."""
-                    }
-                ]
+                messages=[{"role": "user", "content": prompt}]
             )
             
-            # Update token usage
-            self.total_tokens += message.usage.input_tokens + message.usage.output_tokens
+            # Update usage metrics
+            self._usage_metrics["prompt_tokens"] += response.usage.input_tokens
+            self._usage_metrics["completion_tokens"] += response.usage.output_tokens
+            self._usage_metrics["total_tokens"] += response.usage.input_tokens + response.usage.output_tokens
+            self._usage_metrics["cost"] += (
+                response.usage.input_tokens * model_config["cost_per_1k_tokens"] / 1000 +
+                response.usage.output_tokens * model_config["cost_per_1k_tokens"] / 1000
+            )
             
-            # Parse the response - content is now a list of content blocks
-            response_text = ""
-            for content_block in message.content:
-                if hasattr(content_block, 'text'):
-                    response_text += content_block.text
-                else:
-                    response_text += str(content_block)
-            
-            # Clean up the response text
-            response_text = response_text.replace('\r', '').replace('\t', ' ')
-            
-            # Find the JSON part of the response
-            start = response_text.find('{')
-            end = response_text.rfind('}') + 1
-            if start >= 0 and end > start:
-                response_text = response_text[start:end]
-            
-            import json
+            # Parse response
             try:
-                response = json.loads(response_text)
+                content = response.content[0].text
+                print("\nRaw response:")
+                print(content)
+                
+                data = json.loads(content)
+                print("\nParsed JSON:")
+                print(json.dumps(data, indent=2))
+                
+                # Extract rules from the response
+                rules_data = data.get("rules", [])
+                if not rules_data:
+                    raise ValueError("No rules found in response")
+                
+                rules = []
+                for rule in rules_data:
+                    try:
+                        rules.append(Rule(
+                            state=rule["state"],
+                            pattern=rule["pattern"],
+                            move=rule["move"],
+                            next_state=rule["next_state"]
+                        ))
+                    except (KeyError, ValueError) as e:
+                        print(f"Invalid rule format: {rule}, error: {str(e)}")
+                return rules
             except json.JSONDecodeError as e:
-                # Try to clean up the response text further
-                response_text = ''.join(c for c in response_text if c.isprintable())
-                try:
-                    response = json.loads(response_text)
-                except json.JSONDecodeError as e2:
-                    raise ValueError(f"Failed to parse JSON response: {str(e2)}")
-            
-            # Validate the response
-            if not all(k in response for k in ["move", "reasoning", "confidence"]):
-                raise ValueError("Response missing required fields")
-            
-            if response["move"] not in ["North", "South", "East", "West"]:
-                raise ValueError(f"Invalid move: {response['move']}")
-            
-            if not 0 <= response["confidence"] <= 1:
-                raise ValueError(f"Invalid confidence value: {response['confidence']}")
-            
-            return response
-            
+                print(f"\nJSON decode error: {str(e)}")
+                # Try to salvage partial rules
+                rules = self._extract_individual_rules(response.content[0].text)
+                if rules:
+                    return rules
+                raise ValueError("Failed to parse rules from response")
+                
         except Exception as e:
-            raise RuntimeError(f"Failed to get next move: {str(e)}")
-    
+            raise ConnectionError(f"Failed to generate rules: {str(e)}")
+            
+    def _extract_individual_rules(self, content: str) -> List[Rule]:
+        """Extract individual rules from potentially malformed JSON response.
+        
+        Args:
+            content: Response content to parse
+            
+        Returns:
+            List of extracted rules
+        """
+        rules = []
+        # Look for rule-like patterns
+        pattern = r'{\s*"state"\s*:\s*(\d+)\s*,\s*"pattern"\s*:\s*"([NSEWx]{4})"\s*,\s*"move"\s*:\s*"([NSEW])"\s*,\s*"next_state"\s*:\s*(\d+)\s*}'
+        matches = re.finditer(pattern, content)
+        
+        for match in matches:
+            try:
+                rules.append(Rule(
+                    state=int(match.group(1)),
+                    pattern=match.group(2),
+                    move=match.group(3),
+                    next_state=int(match.group(4))
+                ))
+            except (ValueError, IndexError):
+                continue
+                
+        return rules
+        
     def cleanup(self) -> None:
-        """Clean up any resources used by the provider."""
+        """Clean up resources."""
         self.client = None
         
-    def get_metrics(self) -> Dict[str, Any]:
-        """Get usage metrics for the provider.
+    def get_usage_metrics(self) -> Dict:
+        """Get usage metrics.
         
         Returns:
             Dictionary containing usage metrics
         """
-        return {
-            "total_tokens": self.total_tokens,
-            "total_cost": self.total_cost
-        } 
+        return self._usage_metrics.copy() 

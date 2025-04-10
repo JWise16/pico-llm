@@ -1,7 +1,7 @@
 # LLM Integration Demo
 
 ## Introduction
-This demo walks through our findings, challenges, and some fascinating behaviors we've observed while letting LLM's play picbot.
+This demo walks through our findings, challenges, and some fascinating behaviors we've observed while using LLMs to generate rules for Picobot.
 
 ## Demo Flow
 
@@ -20,28 +20,28 @@ The genetic algorithm approach gives us interesting insights into this strategy:
 - Develops wall-following behaviors organically
 - Uses state transitions strategically
 
-### 3. LLM Attempts at Rule Generation
+### 3. LLM Rule Generation
 
 #### OpenAI (GPT-3.5)
 ```bash
 python -m picobot --llm --provider openai --model gpt-3.5-turbo --steps 100
 ```
 Interesting behaviors:
-- Tends to generate overly simplistic rules
-- Often defaults to basic North-South alternation
-- Struggles with pattern format despite explicit instructions
+- Generates complete rule sets upfront
+- Tends to create systematic exploration patterns
+- Sometimes misses edge cases requiring default rules
 
 #### Anthropic (Claude)
 ```bash
 python -m picobot --llm --provider anthropic --model claude-3-opus-20240229 --steps 100
 ```
-Different challenges:
-- Attempts more sophisticated strategies but fails in execution
-- Often includes explanatory comments (which break parsing)
-- Tries to use wildcards (*) instead of 'x'
+Different approaches:
+- Creates more comprehensive rule sets
+- Often includes better state transition logic
+- May generate rules with explanatory comments
 
-### 4. Pattern Format Challenge
-A fascinating challenge we've encountered is getting LLMs to consistently follow the pattern format:
+### 4. Rule Format Challenge
+A fascinating challenge we've encountered is getting LLMs to consistently follow the rule format:
 
 Expected:
 ```
@@ -57,35 +57,44 @@ State 0: NExx -> W 1  # Adds labels
 ```
 
 ### 5. Strategic Thinking
-The LLMs understand the concept of wall-following and state transitions, as seen in their explanations:
+The LLMs demonstrate understanding of exploration strategies in their rule generation:
 
 ```
-"Following a right-hand wall strategy in State 0..."
-"Using State 1 for corner handling..."
-"State 2 handles backtracking from dead ends..."
+"State 0: Basic wall following..."
+"State 1: Corner handling..."
+"State 2: Backtracking from dead ends..."
 ```
 
-But they struggle to translate this understanding into valid rule syntax.
+And they often create rule sets that reflect this understanding:
+```
+0 NExx -> W 1    # Handle north-east corner
+0 NxWx -> E 0    # Follow north wall
+1 xExx -> S 2    # Handle east wall
+2 xxSx -> W 1    # Backtrack from south wall
+```
 
-### 6. Current Workarounds
+### 6. Current Solutions
+- JSON-based rule generation for better format control
+- Automatic validation and correction of rule format
 - Default rules for missing patterns
-- Strict validation of rule format
-- Pattern cleanup attempts
+- State machine validation
 
 ### 7. Future Directions
-- Hybrid approach combining LLM strategy with evolution-based optimization
-- More sophisticated prompt engineering
-- Potential for learning from successful evolution-generated rules
+- Enhanced prompt engineering for more reliable rule generation
+- Hybrid approaches combining LLM-generated rules with evolution-based optimization
+- Learning from successful rule sets to improve generation
+- Better handling of edge cases and special situations
 
 ## Interactive Elements
 During the demo, we can:
-1. Modify prompts in real-time
+1. Examine generated rule sets
 2. Compare coverage between different approaches
-3. Examine specific rule generation attempts
+3. Analyze state transition patterns
 4. Discuss potential improvements with the Picobot team
 
 ## Discussion Points
 1. How does LLM rule generation compare to evolution-based approaches?
-2. Could we use LLMs to optimize evolution parameters?
-3. What makes rule format adherence so challenging for LLMs?
-4. How might we better leverage LLMs' strategic understanding? 
+2. What strategies do LLMs use to create exploration patterns?
+3. How can we improve rule format adherence?
+4. What makes certain rule sets more effective than others?
+5. How can we better leverage LLMs' understanding of exploration strategies? 

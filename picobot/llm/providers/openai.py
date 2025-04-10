@@ -1,123 +1,182 @@
+"""OpenAI provider for Picobot LLM integration."""
+
 import json
-from typing import Dict, Any, Optional
 import os
-from openai import OpenAI
-from httpx import Timeout
-from ..base import LLMInterface, LLMResponse
-from ...config.llm_config import LLMConfig
-from ...game.state import State
+import re
+from typing import List, Dict, Any, Optional
+import openai
+from ..base import LLMInterface, Rule
+from ..prompts import get_prompt
 
 class OpenAIProvider(LLMInterface):
-    """OpenAI implementation of the LLM interface."""
+    """OpenAI provider implementation."""
     
-    def __init__(self, model_name: str, temperature: float = 0.7, config: Optional[LLMConfig] = None):
-        super().__init__(model_name, temperature)
-        self.config = config or LLMConfig()
-        
-        # Initialize OpenAI client with proper configuration
-        self.client = OpenAI(
-            api_key=self.config.openai_api_key,
-            timeout=Timeout(
-                connect=2.0,    # connection timeout
-                read=10.0,      # read timeout
-                write=3.0,      # write timeout
-                pool=5.0        # pool timeout
-            ),
-            max_retries=self.config.max_retries,
-            default_headers={   # Add headers for better error tracking
-                "X-Application": "picobot",
-                "X-Application-Version": "1.0.0"
-            }
-        )
-        
-        self.model_config = self.config.openai_models.get(model_name, {})
-        
-        # Add chat completions interface
-        self.chat = self.client.chat
-    
-    def initialize(self) -> None:
-        """Initialize the OpenAI client."""
-        if not self.config.openai_api_key:
-            raise ValueError("OpenAI API key not found. Please set OPENAI_API_KEY in your .env file.")
-        
-        # Test the connection with a simple request
-        try:
-            self.client.with_options(timeout=5.0).chat.completions.create(
-                model=self.model_name,
-                messages=[{"role": "system", "content": "Test connection. Respond in JSON format."}],
-                max_tokens=1,
-                response_format={"type": "json_object"}
-            )
-        except Exception as e:
-            raise RuntimeError(f"Failed to initialize OpenAI client: {str(e)}")
-    
-    def get_next_move(self, state: State) -> Dict[str, Any]:
-        """Get the next move from OpenAI's LLM.
+    def __init__(self, model_name: str = "gpt-4", temperature: float = 0.7):
+        """Initialize OpenAI provider.
         
         Args:
-            state: Current game state
+            model_name: Name of the model to use
+            temperature: Temperature setting for generation
+        """
+        super().__init__(model_name, temperature)
+        self.client = None
+        self.model_config = {
+            "gpt-4": {
+                "max_tokens": 4000,
+                "cost_per_1k_tokens": 0.03
+            },
+            "gpt-3.5-turbo": {
+                "max_tokens": 4000,
+                "cost_per_1k_tokens": 0.002
+            }
+        }
+        self._usage_metrics = {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0,
+            "cost": 0.0
+        }
+        
+    def initialize(self, api_key: Optional[str] = None) -> None:
+        """Initialize OpenAI client.
+        
+        Args:
+            api_key: Optional API key to use. If not provided, will use environment variable.
+            
+        Raises:
+            ConnectionError: If initialization fails
+        """
+        try:
+            if api_key:
+                openai.api_key = api_key
+            self.client = openai.OpenAI()
+            # Test connection with a simple request
+            self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[{"role": "user", "content": "test"}],
+                max_tokens=5
+            )
+        except Exception as e:
+            raise ConnectionError(f"Failed to initialize OpenAI client: {str(e)}")
+            
+    def generate_rules(self, prompt_name: str = 'basic', num_rules: int = 9) -> List[Rule]:
+        """Generate rules using OpenAI.
+        
+        Args:
+            prompt_name: Name of the prompt to use
+            num_rules: Number of rules to generate
             
         Returns:
-            Dictionary containing move, reasoning, and confidence
+            List of generated rules
+            
+        Raises:
+            ValueError: If the prompt name is invalid
+            ConnectionError: If there are API connection issues
         """
-        # Format the state for the prompt
-        state_desc = f"""Current Position: ({state.position[0]}, {state.position[1]})
-Walls: {state.walls}
-Visited Cells: {len(state.visited)}
-Total Steps: {state.steps}"""
-        
+        if not self.client:
+            raise ConnectionError("OpenAI client not initialized")
+            
         try:
-            # Create the message with the prompt
+            # Get prompt and format it
+            prompt = get_prompt(prompt_name)
+            prompt = prompt.format(num_rules=num_rules)
+            
+            # Get model config
+            model_config = self.model_config.get(self.model_name, {
+                "max_tokens": 4000,
+                "cost_per_1k_tokens": 0.03
+            })
+            
+            # Generate response
             response = self.client.chat.completions.create(
                 model=self.model_name,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a Picobot controller that always responds in valid JSON format with move, reasoning, and confidence fields."
-                    },
-                    {
-                        "role": "user",
-                        "content": f"""You are controlling a Picobot in a grid-based environment. Your task is to navigate while avoiding walls and maximizing exploration.
-
-Current State:
-{state_desc}
-
-Please analyze the state and choose the next move. Respond in JSON format with:
-- move: The chosen direction (N/E/W/S)
-- reasoning: Your explanation for the choice
-- confidence: Your confidence in the move (0.0 to 1.0)"""
-                    }
-                ],
+                messages=[{"role": "user", "content": prompt}],
                 temperature=self.temperature,
-                max_tokens=self.model_config.get("max_tokens", 1000),
-                response_format={"type": "json_object"}
+                max_tokens=model_config["max_tokens"]
             )
             
-            # Parse the response
-            content = response.choices[0].message.content
+            # Update usage metrics
+            self._usage_metrics["prompt_tokens"] += response.usage.prompt_tokens
+            self._usage_metrics["completion_tokens"] += response.usage.completion_tokens
+            self._usage_metrics["total_tokens"] += response.usage.total_tokens
+            self._usage_metrics["cost"] += (
+                response.usage.prompt_tokens * model_config["cost_per_1k_tokens"] / 1000 +
+                response.usage.completion_tokens * model_config["cost_per_1k_tokens"] / 1000
+            )
+            
+            # Parse response
             try:
-                move_data = json.loads(content)
+                content = response.choices[0].message.content
+                print("\nRaw response:")
+                print(content)
+                
+                data = json.loads(content)
+                print("\nParsed JSON:")
+                print(json.dumps(data, indent=2))
+                
+                # Extract rules from the response
+                rules_data = data.get("rules", [])
+                if not rules_data:
+                    raise ValueError("No rules found in response")
+                
+                rules = []
+                for rule in rules_data:
+                    try:
+                        rules.append(Rule(
+                            state=rule["state"],
+                            pattern=rule["pattern"],
+                            move=rule["move"],
+                            next_state=rule["next_state"]
+                        ))
+                    except (KeyError, ValueError) as e:
+                        print(f"Invalid rule format: {rule}, error: {str(e)}")
+                return rules
             except json.JSONDecodeError as e:
-                raise ValueError(f"Failed to parse JSON response: {str(e)}")
-            
-            # Validate the move
-            if move_data["move"] not in ["N", "E", "W", "S"]:
-                raise ValueError(f"Invalid move: {move_data['move']}")
-            
-            # Update metrics
-            self.total_tokens += response.usage.total_tokens
-            self.total_cost += (response.usage.total_tokens / 1000) * self.model_config.get("cost_per_1k_tokens", 0.002)
-            
-            return {
-                "move": move_data["move"],
-                "reasoning": move_data["reasoning"],
-                "confidence": move_data["confidence"]
-            }
-            
+                print(f"\nJSON decode error: {str(e)}")
+                # Try to salvage partial rules
+                rules = self._extract_individual_rules(response.choices[0].message.content)
+                if rules:
+                    return rules
+                raise ValueError("Failed to parse rules from response")
+                
         except Exception as e:
-            raise RuntimeError(f"Failed to get move from OpenAI: {str(e)}")
-    
+            raise ConnectionError(f"Failed to generate rules: {str(e)}")
+            
+    def _extract_individual_rules(self, content: str) -> List[Rule]:
+        """Extract individual rules from potentially malformed JSON response.
+        
+        Args:
+            content: Response content to parse
+            
+        Returns:
+            List of extracted rules
+        """
+        rules = []
+        # Look for rule-like patterns
+        pattern = r'{\s*"state"\s*:\s*(\d+)\s*,\s*"pattern"\s*:\s*"([NSEWx]{4})"\s*,\s*"move"\s*:\s*"([NSEW])"\s*,\s*"next_state"\s*:\s*(\d+)\s*}'
+        matches = re.finditer(pattern, content)
+        
+        for match in matches:
+            try:
+                rules.append(Rule(
+                    state=int(match.group(1)),
+                    pattern=match.group(2),
+                    move=match.group(3),
+                    next_state=int(match.group(4))
+                ))
+            except (ValueError, IndexError):
+                continue
+                
+        return rules
+        
     def cleanup(self) -> None:
-        """Clean up any resources used by the provider."""
-        # OpenAI client doesn't need cleanup
-        pass 
+        """Clean up resources."""
+        self.client = None
+        
+    def get_usage_metrics(self) -> Dict:
+        """Get usage metrics.
+        
+        Returns:
+            Dictionary containing usage metrics
+        """
+        return self._usage_metrics.copy() 
