@@ -35,6 +35,8 @@ class Picobot:
         self.state = 0  # Start in state 0
         self.array[start_row][start_col].visited = True
         self.num_visited = 1
+        self.consecutive_invalid_moves = 0  # Track consecutive invalid moves
+        self.max_stuck_steps = 10  # Maximum number of consecutive invalid moves before considering stuck
     
     def step(self) -> bool:
         """Take one step according to the program rules.
@@ -77,6 +79,7 @@ class Picobot:
            (move == "S" and self.robot_row == ROWS - 1) or \
            (move == "E" and self.robot_col == COLUMNS - 1) or \
            (move == "W" and self.robot_col == 0):
+            self.consecutive_invalid_moves += 1
             return False
         
         # Update robot position based on move
@@ -92,7 +95,11 @@ class Picobot:
         # Check if the move was valid
         if (self.robot_row < 0 or self.robot_row >= ROWS or 
             self.robot_col < 0 or self.robot_col >= COLUMNS):
+            self.consecutive_invalid_moves += 1
             return False
+        
+        # Reset consecutive invalid moves counter if move was valid
+        self.consecutive_invalid_moves = 0
         
         # Update visited status
         if not self.array[self.robot_row][self.robot_col].visited:
@@ -101,14 +108,34 @@ class Picobot:
         
         return True
     
-    def run(self, steps: int) -> None:
+    def run(self, steps: int) -> int:
         """Run the program for a given number of steps.
         
         Args:
             steps: Number of steps to run
+            
+        Returns:
+            int: Number of steps actually taken before termination
         """
+        steps_taken = 0
         for _ in range(steps):
             self.step()
+            steps_taken += 1
+            
+            # Check if robot is stuck
+            if self.consecutive_invalid_moves >= self.max_stuck_steps:
+                print(f"\nRobot appears to be stuck after {steps_taken} steps. Terminating simulation.")
+                break
+                
+        return steps_taken
+    
+    def is_stuck(self) -> bool:
+        """Check if the robot is stuck.
+        
+        Returns:
+            bool: True if the robot is stuck, False otherwise
+        """
+        return self.consecutive_invalid_moves >= self.max_stuck_steps
     
     def __repr__(self) -> str:
         """String representation of the current state of the environment."""

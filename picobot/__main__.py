@@ -11,6 +11,7 @@ from .llm.providers.anthropic import AnthropicProvider
 from .config.llm_config import LLMConfig
 from .llm.rule_generator import generate_rules
 from .llm.prompts import AVAILABLE_PROMPTS
+from .llm.scoring import ScoreCalculator
 
 def main():
     """Main entry point for the Picobot game."""
@@ -26,6 +27,8 @@ def main():
     parser.add_argument("--population", type=int, default=100, help="Population size for evolution")
     parser.add_argument("--generations", type=int, default=50, help="Number of generations to evolve")
     parser.add_argument("--steps", type=int, default=500, help="Number of steps to run visualization")
+    parser.add_argument("--evaluate", action="store_true", help="Evaluate the program's performance")
+    parser.add_argument("--trials", type=int, default=5, help="Number of trials for evaluation")
     args = parser.parse_args()
     
     if args.llm:
@@ -40,7 +43,7 @@ def main():
         
         try:
             print(f"\nGenerating rules using {args.provider} ({args.model}) with {args.prompt} prompt...")
-            program = generate_rules(provider, prompt_name=args.prompt)
+            program, evaluation_results = generate_rules(provider, prompt_name=args.prompt, evaluate=args.evaluate)
             print("\nGenerated Rules:")
             print(program)
             
@@ -51,13 +54,19 @@ def main():
             
             # Visualize the Picobot
             visualizer = Visualizer()
-            visualizer.run(picobot, args.steps)
+            steps_taken = visualizer.run(picobot, args.steps)
+            print(f"\nSimulation ended after {steps_taken} steps")
             
             # Print metrics
             metrics = provider.get_usage_metrics()
             print("\nLLM Metrics:")
             print(f"Total tokens used: {metrics['total_tokens']}")
             print(f"Total cost: ${metrics['cost']:.4f}")
+            
+            # Evaluate the program if requested
+            if args.evaluate:
+                print("\nProgram Evaluation:")
+                print(evaluation_results["explanation"])
             
         finally:
             # Cleanup
@@ -82,7 +91,23 @@ def main():
         
         # Visualize the Picobot
         visualizer = Visualizer()
-        visualizer.run(picobot, args.steps)
+        steps_taken = visualizer.run(picobot, args.steps)
+        print(f"\nSimulation ended after {steps_taken} steps")
+        
+        # Evaluate the program if requested
+        if args.evaluate:
+            print("\nEvaluating program performance...")
+            calculator = ScoreCalculator(trials=args.trials, steps_per_trial=200)
+            scores = calculator.evaluate_program(program)
+            explanation = calculator.get_score_explanation(scores)
+            print("\nEvaluation results:")
+            print(explanation)
+            
+            # Print stuck statistics
+            if scores.get("stuck_count", 0) > 0:
+                print(f"\nStuck Statistics:")
+                print(f"Number of trials where robot got stuck: {scores['stuck_count']}")
+                print(f"Percentage of trials where robot got stuck: {scores['stuck_percentage']:.1f}%")
 
 if __name__ == "__main__":
     main() 

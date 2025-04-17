@@ -1,20 +1,22 @@
 """Rule generation using LLM providers."""
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 from .base import LLMInterface, Rule
 from ..program import Program
 from ..constants import VALID_PATTERNS, MAX_STATES
+from .scoring import ScoreCalculator
 import json
 
-def generate_rules(provider: LLMInterface, prompt_name: str = 'basic') -> Program:
+def generate_rules(provider: LLMInterface, prompt_name: str = 'basic', evaluate: bool = True) -> Tuple[Program, Dict[str, Any]]:
     """Generate a complete set of Picobot rules using an LLM provider.
     
     Args:
         provider: The LLM provider to use for rule generation
         prompt_name: Name of the prompt to use (default: 'basic')
+        evaluate: Whether to evaluate the generated program (default: True)
         
     Returns:
-        Program object with the generated rules
+        Tuple of (Program object with the generated rules, evaluation results if evaluate=True)
     """
     try:
         # Get rules from LLM
@@ -100,7 +102,20 @@ def generate_rules(provider: LLMInterface, prompt_name: str = 'basic') -> Progra
         for (state, pattern), (move, next_state) in sorted(program.rules_dict.items()):
             print(f"  {state} {pattern} -> {move} {next_state}")
         
-        return program
+        # Evaluate the program if requested
+        evaluation_results = {}
+        if evaluate:
+            print("\nEvaluating program performance...")
+            calculator = ScoreCalculator(trials=3, steps_per_trial=200)
+            scores = calculator.evaluate_program(program)
+            evaluation_results = {
+                "scores": scores,
+                "explanation": calculator.get_score_explanation(scores)
+            }
+            print("\nEvaluation results:")
+            print(evaluation_results["explanation"])
+        
+        return program, evaluation_results
         
     except Exception as e:
         print(f"\nError during rule generation: {str(e)}")

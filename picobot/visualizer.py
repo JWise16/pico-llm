@@ -4,7 +4,7 @@ import pygame
 from typing import Optional
 from .constants import (
     CELL_SIZE, WINDOW_WIDTH, WINDOW_HEIGHT, FPS,
-    BLACK, WHITE, BLUE, GREEN, GRAY
+    BLACK, WHITE, BLUE, GREEN, GRAY, RED
 )
 from .robot import Picobot
 
@@ -19,6 +19,7 @@ class Visualizer:
         self.clock = pygame.time.Clock()
         self.running = False
         self.picobot: Optional[Picobot] = None
+        self.font = pygame.font.SysFont(None, 24)
     
     def draw_cell(self, row: int, col: int, color: tuple) -> None:
         """Draw a cell at the given position with the specified color.
@@ -65,20 +66,32 @@ class Visualizer:
                     self.draw_cell(row, col, GRAY)
         
         # Draw robot
-        self.draw_cell(self.picobot.robot_row, self.picobot.robot_col, GREEN)
+        robot_color = RED if self.picobot.is_stuck() else GREEN
+        self.draw_cell(self.picobot.robot_row, self.picobot.robot_col, robot_color)
+        
+        # Draw status text
+        status_text = f"Steps: {self.step_count} | Visited: {self.picobot.num_visited}"
+        if self.picobot.is_stuck():
+            status_text += " | STUCK!"
+        
+        text_surface = self.font.render(status_text, True, BLACK)
+        self.screen.blit(text_surface, (10, 10))
     
-    def run(self, picobot: Picobot, steps: int = 500) -> None:
+    def run(self, picobot: Picobot, steps: int = 500) -> int:
         """Run the visualization with the given Picobot.
         
         Args:
             picobot: Picobot instance to visualize
             steps: Number of steps to run
+            
+        Returns:
+            int: Number of steps actually taken before termination
         """
         self.picobot = picobot
         self.running = True
-        step_count = 0
+        self.step_count = 0
         
-        while self.running and step_count < steps:
+        while self.running and self.step_count < steps:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     self.running = False
@@ -89,9 +102,18 @@ class Visualizer:
             self.draw_environment()
             pygame.display.flip()
             
+            # Take a step and check if the robot got stuck
             if self.picobot.step():
-                step_count += 1
+                self.step_count += 1
+            
+            # Check if robot is stuck
+            if self.picobot.is_stuck():
+                print(f"\nRobot appears to be stuck after {self.step_count} steps. Terminating simulation.")
+                # Wait a moment to show the stuck state
+                pygame.time.wait(1000)
+                break
             
             self.clock.tick(FPS)
         
-        pygame.quit() 
+        pygame.quit()
+        return self.step_count 

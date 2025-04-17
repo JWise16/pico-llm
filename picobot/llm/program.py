@@ -5,6 +5,7 @@ from ..program import Program
 from .base import LLMInterface
 from ..game.state import State
 from ..constants import ROWS, COLUMNS
+from .scoring import ScoreCalculator
 
 class LLMProgram(Program):
     """Program that uses an LLM provider for decision making."""
@@ -18,6 +19,7 @@ class LLMProgram(Program):
         super().__init__()
         self.provider = provider
         self.current_state = 0  # Keep track of state for compatibility
+        self.score_calculator = ScoreCalculator()
     
     def get_move(self, state: int, pattern: str) -> Tuple[str, int]:
         """Get the next move from the LLM.
@@ -148,3 +150,27 @@ class LLMProgram(Program):
                 if self.robot.array[row][col].visited:
                     visited.add((row, col))
         return visited 
+    
+    def evaluate_performance(self, trials: int = 5, steps_per_trial: int = 200) -> Dict[str, Any]:
+        """Evaluate the performance of this program.
+        
+        Args:
+            trials: Number of trials to run
+            steps_per_trial: Number of steps per trial
+            
+        Returns:
+            Dictionary containing performance metrics
+        """
+        # Create a new score calculator with the specified parameters
+        calculator = ScoreCalculator(trials=trials, steps_per_trial=steps_per_trial)
+        
+        # Evaluate the program
+        scores = calculator.evaluate_program(self)
+        
+        # Get a human-readable explanation
+        explanation = calculator.get_score_explanation(scores)
+        
+        return {
+            "scores": scores,
+            "explanation": explanation
+        } 

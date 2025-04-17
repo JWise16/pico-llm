@@ -3,12 +3,14 @@
 from .basic import BASIC_PROMPT
 from .wall_following import WALL_FOLLOWING_PROMPT
 from .systematic import SYSTEMATIC_PROMPT
+from .english import ENGLISH_PROMPT
 
 # Dictionary mapping prompt names to their content
 AVAILABLE_PROMPTS = {
     'basic': BASIC_PROMPT,
     'wall_following': WALL_FOLLOWING_PROMPT,
-    'systematic': SYSTEMATIC_PROMPT
+    'systematic': SYSTEMATIC_PROMPT,
+    'english': ENGLISH_PROMPT
 }
 
 def get_prompt(prompt_name: str) -> str:

@@ -1,6 +1,6 @@
-"""Basic prompt for Picobot rule generation."""
+"""English language prompt for Picobot rule generation."""
 
-BASIC_PROMPT = """Generate a complete set of Picobot rules that will allow the robot to visit every cell in its environment.
+ENGLISH_PROMPT = """Generate a complete set of Picobot rules that will allow the robot to visit every cell in its environment.
 
 The rules must follow this EXACT format:
 STATE PATTERN -> MOVE NEXT_STATE
@@ -45,11 +45,11 @@ IMPORTANT: You MUST generate rules for ALL of these patterns for EACH state:
 - xxWx (wall to west)
 
 Generate a complete set of rules that:
-1. Uses all 5 states (0-4)
-2. Covers ALL possible wall patterns listed above for EACH state
-3. Implements a wall-following strategy
-4. Avoids getting stuck in loops
-5. Uses state transitions strategically
+- go north until you hit a boundary
+- enter a new state that takes us west until we hit a west boundary
+- enter a new state that moves us south until we hit a south boundary
+- then move east one step now enter a new state that takes us north to the north boundary - when we hit the north boundary, then move east one step, and then move to the south bondary, move east one step, and then repeat the north south sweeping process with one move east inbetween each time
+- repeat this north south sweeping process until we fill the whole room
 
 Respond with a JSON object containing a "rules" array, where each rule has:
 - state: number (0-4)

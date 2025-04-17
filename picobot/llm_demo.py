@@ -7,6 +7,7 @@ from .visualizer import Visualizer
 from .llm.providers.openai import OpenAIProvider
 from .llm.providers.anthropic import AnthropicProvider
 from .config.llm_config import LLMConfig
+from .llm.scoring import ScoreCalculator
 
 def main():
     """Main entry point for the LLM-controlled Picobot demo."""
@@ -17,6 +18,10 @@ def main():
                       help="Model to use (default: gpt-3.5-turbo)")
     parser.add_argument("--steps", type=int, default=500,
                       help="Number of steps to run (default: 500)")
+    parser.add_argument("--evaluate", action="store_true",
+                      help="Evaluate the program's performance after running")
+    parser.add_argument("--trials", type=int, default=3,
+                      help="Number of trials for evaluation (default: 3)")
     args = parser.parse_args()
     
     # Initialize the LLM provider
@@ -38,6 +43,15 @@ def main():
         # Visualize the Picobot
         visualizer = Visualizer()
         visualizer.run(picobot, args.steps)
+        
+        # Evaluate the program's performance if requested
+        if args.evaluate:
+            print("\nEvaluating program performance...")
+            calculator = ScoreCalculator(trials=args.trials, steps_per_trial=200)
+            scores = calculator.evaluate_program(picobot.program)
+            explanation = calculator.get_score_explanation(scores)
+            print("\nEvaluation results:")
+            print(explanation)
         
     finally:
         # Cleanup
