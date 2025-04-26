@@ -4,8 +4,10 @@ anthropic
 python-dotenv
 pydantic
 pytest
-pandas
-matplotlib
+pandas>=2.0.0
+matplotlib>=3.7.0
 rich
 httpx
-tqdm 
+tqdm
+tabulate
+seaborn>=0.12.0 

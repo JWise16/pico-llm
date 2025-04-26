@@ -5,6 +5,7 @@ import os
 import re
 from typing import List, Dict, Any, Optional
 import openai
+from dotenv import load_dotenv
 from ..base import LLMInterface, Rule
 from ..prompts import get_prompt
 
@@ -47,9 +48,17 @@ class OpenAIProvider(LLMInterface):
             ConnectionError: If initialization fails
         """
         try:
-            if api_key:
-                openai.api_key = api_key
-            self.client = openai.OpenAI()
+            # Load environment variables
+            load_dotenv()
+            
+            # Get API key from parameter or environment
+            api_key = api_key or os.getenv("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OpenAI API key not found. Please set OPENAI_API_KEY environment variable or pass it directly.")
+            
+            # Initialize client with API key
+            self.client = openai.OpenAI(api_key=api_key)
+            
             # Test connection with a simple request
             self.client.chat.completions.create(
                 model=self.model_name,
