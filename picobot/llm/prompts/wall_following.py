@@ -45,30 +45,60 @@ IMPORTANT: You MUST generate rules for ALL of these patterns for EACH state:
 - xxWx (wall to west)
 
 STRATEGY REQUIREMENTS:
-1. Use a consistent wall-following direction:
-   - State 0: Follow right-hand wall (prefer moving right when possible)
-   - State 1: Follow left-hand wall (prefer moving left when possible)
-   - State 2: Handle corners and special cases
-   - State 3: Backup state for when stuck
-   - State 4: Recovery state for complex situations
+1. Implement a right-hand wall-following strategy:
+   - State 0: Initial state, find a wall to follow
+   - State 1: Following wall on right
+   - State 2: Handling corners (turning right)
+   - State 3: Recovery from stuck positions
+   - State 4: Special cases and backtracking
 
 2. State Transitions:
-   - Stay in the same state when continuing along a wall
-   - Only change states when:
-     a) Hitting a corner (use state 2)
-     b) Getting stuck (use state 3)
-     c) Need to recover (use state 4)
+   - State 0 -> State 1: When wall found on right
+   - State 1 -> State 2: When hitting a corner
+   - State 2 -> State 1: After turning corner
+   - Any State -> State 3: When stuck
+   - State 3 -> State 4: When recovery needed
+   - State 4 -> State 0: When back on track
 
 3. Movement Priorities:
-   - When no walls: Move in preferred direction
-   - When wall ahead: Turn along the wall
-   - When corner: Use special corner handling
-   - When stuck: Use backup movement
+   - When no walls: Move until finding a wall
+   - When wall on right: Follow it
+   - When corner: Turn right
+   - When stuck: Try alternate directions
 
-4. Avoid Loops:
-   - Don't keep switching between states unnecessarily
-   - Use state transitions strategically
+4. Coverage Optimization:
+   - Keep wall on right whenever possible
+   - Turn right at corners to maintain wall contact
+   - Use recovery states to escape dead ends
+   - Ensure systematic coverage of the space
+
+5. Anti-Loop Measures:
+   - Use state transitions to track progress
+   - Change states when stuck
    - Have clear conditions for state changes
+   - Ensure forward progress
+
+EXAMPLE RULES:
+State 0 (Finding wall):
+- xxxx -> E 0 (Move east until wall found)
+- xExx -> S 1 (Wall found on right, start following)
+
+State 1 (Following wall):
+- xxxS -> E 1 (Wall on right, keep moving)
+- xExx -> S 1 (Wall on right, keep moving)
+- NExx -> S 2 (Corner found, prepare to turn)
+
+State 2 (Turning corner):
+- NExx -> S 1 (Turn right at corner)
+- NxWx -> E 1 (Turn right at corner)
+
+State 3 (Recovery):
+- xxxx -> N 4 (Try moving away from stuck position)
+- Nxxx -> E 4 (Try alternate direction)
+
+State 4 (Special cases):
+- xxxx -> W 0 (Return to initial state)
+- xxxS -> N 0 (Return to initial state)
 
 Respond with a JSON object containing a "rules" array, where each rule has:
 - state: number (0-4)
