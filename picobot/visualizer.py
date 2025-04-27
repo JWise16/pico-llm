@@ -116,4 +116,32 @@ class Visualizer:
             self.clock.tick(FPS)
         
         pygame.quit()
+        return self.step_count
+
+    def headless_run(self, picobot: Picobot, steps: int = 500) -> int:
+        """Run the simulation without visualization.
+        
+        Args:
+            picobot: Picobot instance to simulate
+            steps: Number of steps to run
+            
+        Returns:
+            int: Number of steps actually taken before termination
+        """
+        self.picobot = picobot
+        self.step_count = 0
+        
+        while self.step_count < steps:
+            # Take a step and check if the robot got stuck
+            if self.picobot.step():
+                self.step_count += 1
+            
+            # Check if robot is stuck
+            if self.picobot.is_stuck():
+                print(f"\nRobot appears to be stuck after {self.step_count} steps. Terminating simulation.")
+                break
+            
+            # Add a small delay to prevent CPU overuse
+            pygame.time.wait(10)
+        
         return self.step_count 

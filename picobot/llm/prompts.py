@@ -61,7 +61,7 @@ Respond with a JSON object containing a "rules" array, where each rule has:
 - move: string (N, E, W, S)
 - next_state: number (0-4)""",
 
-    'wall_following': """Generate a set of Picobot rules that implements a wall-following strategy.
+    'wall_following': """Generate a complete set of Picobot rules that implements a wall-following strategy.
 
 The rules must follow this EXACT format:
 STATE PATTERN -> MOVE NEXT_STATE
@@ -79,12 +79,56 @@ PATTERN FORMAT:
 - NO SPACES in the pattern
 - NO WILDCARDS (*)
 
-The wall-following strategy should:
-1. Keep the wall on the right side when possible
-2. Turn right when hitting a wall
-3. Move forward when no wall is detected
-4. Use states to remember the last move direction
-5. Handle corners and dead ends gracefully
+VALID PATTERN EXAMPLES:
+xxxx (no walls)
+Nxxx (wall to north)
+xExx (wall to east)
+xxWx (wall to west)
+xxxS (wall to south)
+NExx (walls to north and east)
+xxWS (walls to west and south)
+
+INVALID PATTERN EXAMPLES:
+* * * * (has spaces)
+N*** (uses wildcards)
+N x x x (has spaces)
+N*W* (uses wildcards)
+
+IMPORTANT: You MUST generate rules for ALL of these patterns for EACH state:
+- xxxx (no walls)
+- Nxxx (wall to north)
+- NExx (walls to north and east)
+- NxWx (walls to north and west)
+- xxxS (wall to south)
+- xExS (walls to east and south)
+- xxWS (walls to west and south)
+- xExx (wall to east)
+- xxWx (wall to west)
+
+WALL FOLLOWING STRATEGY:
+1. State 0: Follow right wall (move clockwise)
+   - If no wall on right, turn right and move
+   - If wall on right, move forward
+   - If blocked, turn left
+2. State 1: Follow left wall (move counter-clockwise)
+   - If no wall on left, turn left and move
+   - If wall on left, move forward
+   - If blocked, turn right
+3. State 2: Handle dead ends
+   - Turn around and switch wall following direction
+4. State 3: Handle corridors
+   - Continue in current direction if possible
+   - Switch to appropriate wall following state if blocked
+5. State 4: Handle intersections
+   - Prefer continuing wall follow
+   - Switch states if better direction available
+
+EXAMPLE RULES:
+0 xxxx -> E 0 (No walls, move east to find wall)
+0 xExx -> S 1 (Wall on right, move forward)
+1 xxxx -> W 1 (No walls, move west to find wall)
+1 xxWx -> S 1 (Wall on left, move forward)
+2 NExx -> S 1 (Turn around, switch to left wall)
 
 Respond with a JSON object containing a "rules" array, where each rule has:
 - state: number (0-4)

@@ -72,6 +72,9 @@ See the [docs](docs/) directory for detailed documentation:
 - [Evolution Mode Demo](docs/evolution_mode_demo.md)
 - [LLM Mode Demo](docs/llm_mode_demo.md)
 - [LLM Presentation Demo](docs/llm_presentation_demo.md)
+- [Model Performance Analysis](docs/model_performance.md) - Detailed results from testing various Claude models
+- [API Reference](docs/api.md)
+- [OpenAI Model Test Results](docs/openai_test_results.md) - Detailed analysis of OpenAI model performance and prompt effectiveness
 
 ## Current Status
 

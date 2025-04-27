@@ -4,6 +4,7 @@ from typing import Dict, Any, Optional
 from pydantic import BaseModel, Field
 from datetime import datetime
 import uuid
+import re
 
 class ExperimentConfig(BaseModel):
     """Configuration for a single experiment."""
@@ -28,10 +29,34 @@ class ExperimentConfig(BaseModel):
     population_size: Optional[int] = Field(default=None, description="Population size for evolution")
     generations: Optional[int] = Field(default=None, description="Number of generations to evolve")
     
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Generate a descriptive experiment ID if not provided
+        if not data.get('experiment_id'):
+            # Create a base name from provider and model
+            base_name = f"{self.provider}_{self.model}"
+            if self.use_evolution:
+                base_name = f"evolution_{self.population_size}_{self.generations}"
+            
+            # Add prompt and temperature
+            name = f"{base_name}_{self.prompt}_t{self.temperature}"
+            
+            # Add steps and trials
+            name = f"{name}_s{self.steps}_n{self.trials}"
+            
+            # Clean up the name to be filesystem friendly
+            name = re.sub(r'[^a-zA-Z0-9_-]', '_', name)
+            name = re.sub(r'_+', '_', name)
+            name = name.strip('_')
+            
+            # Add timestamp to ensure uniqueness
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.experiment_id = f"{name}_{timestamp}"
+    
     class Config:
         json_schema_extra = {
             "example": {
-                "experiment_id": "123e4567-e89b-12d3-a456-426614174000",
+                "experiment_id": "openai_gpt-4_wall_following_t0.7_s200_n5_20240417_120000",
                 "timestamp": "2024-04-17T12:00:00",
                 "description": "Testing GPT-4 with wall following strategy",
                 "provider": "openai",
