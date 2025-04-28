@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Test suite for analyzing OpenAI model prompt performance in Picobot."""
+"""Test suite for analyzing Anthropic model prompt performance in Picobot."""
 
 import pytest
 import time
@@ -7,7 +7,7 @@ import json
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from picobot.llm.providers.openai import OpenAIProvider
+from picobot.llm.providers.anthropic import AnthropicProvider
 from picobot.robot import Picobot
 from picobot.program import Program
 from picobot.constants import ROWS, COLUMNS, VALID_PATTERNS, MAX_STATES
@@ -18,12 +18,12 @@ load_dotenv()
 @pytest.fixture
 def output_dir():
     """Get the output directory from environment variable."""
-    return os.getenv("PICOBOT_OUTPUT_DIR", "results/openai_analysis")
+    return os.getenv("PICOBOT_OUTPUT_DIR", "results/anthropic_analysis")
 
 @pytest.fixture
-def openai_provider():
-    """Create an OpenAI provider instance."""
-    provider = OpenAIProvider(model_name="gpt-4")
+def anthropic_provider():
+    """Create an Anthropic provider instance."""
+    provider = AnthropicProvider(model_name="claude-3-opus-20240229")
     provider.initialize()
     return provider
 
@@ -78,12 +78,12 @@ def create_program_from_rules(rules):
     
     return program
 
-def run_simulation(openai_provider, prompt_name, maze, max_steps=1000):
+def run_simulation(anthropic_provider, prompt_name, maze, max_steps=1000):
     """Run a simulation with the given prompt and return performance metrics."""
     try:
         print(f"\nGenerating rules for {prompt_name} prompt...")
-        # Get rules from OpenAI
-        rules = openai_provider.generate_rules(prompt_name)
+        # Get rules from Anthropic
+        rules = anthropic_provider.generate_rules(prompt_name)
         print(f"Generated {len(rules)} rules")
         
         # Create program and initialize Picobot
@@ -155,7 +155,7 @@ def run_simulation(openai_provider, prompt_name, maze, max_steps=1000):
             'error': str(e)
         }
 
-def test_prompt_performance(openai_provider, test_maze, output_dir):
+def test_prompt_performance(anthropic_provider, test_maze, output_dir):
     """Test performance of different prompts."""
     prompts = [
         'basic',
@@ -179,7 +179,7 @@ def test_prompt_performance(openai_provider, test_maze, output_dir):
         
         try:
             # Run simulation and get results
-            result = run_simulation(openai_provider, name, test_maze)
+            result = run_simulation(anthropic_provider, name, test_maze)
             results[name] = result
             
             # Print detailed results
@@ -228,7 +228,7 @@ def test_prompt_performance(openai_provider, test_maze, output_dir):
     
     # Save detailed results
     with open(f'{output_dir}/summary.txt', 'w') as f:
-        f.write("OPENAI PROMPT PERFORMANCE ANALYSIS\n")
+        f.write("ANTHROPIC PROMPT PERFORMANCE ANALYSIS\n")
         f.write("=" * 50 + "\n\n")
         
         f.write("Overview:\n")

@@ -100,6 +100,10 @@ class OpenAIProvider(LLMInterface):
         except Exception as e:
             raise ConnectionError(f"Initialization failed: {str(e)}")
 
+    def _supports_response_format(self) -> bool:
+        """Check if the model supports response_format parameter."""
+        return self.model_name.startswith(("gpt-4.1", "o3"))
+
     def generate_rules(self, prompt_name: str = 'basic', num_rules: int = 9) -> List[Rule]:
         """Generate rules using OpenAI."""
         if not self.client:
@@ -158,104 +162,38 @@ class OpenAIProvider(LLMInterface):
                 }
             ]
             
+            # Simplified system prompt
+            system_prompt = """You are a Picobot rule generator. Generate rules for maze navigation.
+Each rule must have:
+- state: number (0-4)
+- pattern: 4 chars (NSEWx)
+- move: N/S/E/W
+- next_state: number (0-4)
+
+Rules must be valid JSON with no comments or extra text.
+Example:
+{
+  "rules": [
+    {"state": 0, "pattern": "xxxx", "move": "E", "next_state": 0},
+    {"state": 0, "pattern": "xExx", "move": "S", "next_state": 1}
+  ]
+}"""
+            
             # Configure parameters based on model type
             params = {
                 "model": self.model_name,
                 "messages": [
-                    {
-                        "role": "system",
-                        "content": """You are a Picobot rule generator implementing a wall-following strategy. You must respond with a VALID JSON object containing a "rules" array. Each rule in the array must have these exact fields:
-- state: number (0-4)
-- pattern: string (4 chars, NSEWx)
-- move: string (N, E, W, S)
-- next_state: number (0-4)
-
-WALL FOLLOWING STRATEGY:
-1. State 0: Initial state - Find a wall
-   - If no walls: Move east until finding a wall
-   - If wall found: Move to state 1
-   - If blocked: Try alternate directions
-
-2. State 1: Follow right wall
-   - Keep wall on right side
-   - If wall on right: Move forward
-   - If no wall on right: Turn right
-   - If blocked: Move to state 2
-
-3. State 2: Handle corners and obstacles
-   - If corner: Turn left and continue
-   - If dead end: Turn around
-   - After handling: Return to state 1
-
-4. State 3: Recovery from stuck
-   - If stuck: Try moving away from current wall
-   - If path found: Return to state 0
-   - If still stuck: Move to state 4
-
-5. State 4: Special cases
-   - Handle complex wall patterns
-   - Try alternate directions
-   - Return to state 0 when clear
-
-MOVEMENT RULES:
-1. Right wall following:
-   - If wall on E: Move S
-   - If wall on S: Move W
-   - If wall on W: Move N
-   - If wall on N: Move E
-
-2. Corner handling:
-   - If NE walls: Move S
-   - If SE walls: Move W
-   - If SW walls: Move N
-   - If NW walls: Move E
-
-3. Dead end handling:
-   - If NSE walls: Move W
-   - If NSW walls: Move E
-   - If NEW walls: Move S
-   - If ESW walls: Move N
-
-IMPORTANT RULES:
-1. The response must be VALID JSON - no comments allowed
-2. Do not include any explanatory text before or after the JSON
-3. Each rule must be a complete object with all required fields
-4. All field names must be in quotes
-5. Use only the specified field names and types
-6. Do not truncate the response - all rules must be complete
-7. Do not use any line comments (//) or block comments (/* */)
-8. Do not use any trailing commas
-9. Do not use any whitespace in patterns
-10. Generate rules for ALL required patterns
-
-Example response format:
-{
-  "rules": [
-    {
-      "state": 0,
-      "pattern": "xxxx",
-      "move": "E",
-      "next_state": 0
-    },
-    {
-      "state": 0,
-      "pattern": "xExx",
-      "move": "S",
-      "next_state": 1
-    }
-  ]
-}"""
-                    },
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": prompt}
                 ],
                 "functions": functions,
                 "function_call": {"name": "generate_picobot_rules"},
-                "response_format": { "type": "json_object" }
+                "max_tokens": 2000  # Reduced from 8000
             }
             
-            # Add token limit parameter
-            token_param = "max_completion_tokens" if self.model_name.startswith("o3") else "max_tokens"
-            params[token_param] = model_config["max_tokens"]
+            # Add response_format only for supported models
+            if self._supports_response_format():
+                params["response_format"] = {"type": "json_object"}
             
             # Add temperature only for non-o3 models
             if not self.model_name.startswith("o3"):
