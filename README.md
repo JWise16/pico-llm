@@ -94,4 +94,67 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
-This is a modern recreation of the original Picobot game, which was created as an educational tool to teach programming and algorithms concepts. The original implementation was written in Python 2 and used turtle graphics for visualization. This version extends the concept by adding LLM-based control capabilities and support for multiple AI providers. 
+This is a modern recreation of the original Picobot game, which was created as an educational tool to teach programming and algorithms concepts. The original implementation was written in Python 2 and used turtle graphics for visualization. This version extends the concept by adding LLM-based control capabilities and support for multiple AI providers.
+
+## Testing Framework
+
+The project includes a comprehensive testing framework for evaluating LLM performance across different providers and models. The testing infrastructure includes:
+
+### Test Scripts
+
+- `run_tests.sh`: Base script for running all tests
+- `run_anthropic_tests.sh`: Tests for Anthropic's Claude models
+- `run_claude_tests.sh`: Specific tests for Claude models
+- `run_claude_comparison.sh`: Comparative analysis between Claude models
+- `run_groq_tests.sh`: Tests for Groq models with parallel execution support
+
+### Test Scenarios
+
+The `tests/scenarios/` directory contains various test files:
+- `test_prompt_performance.py`: Base performance testing
+- `test_openai_prompt_performance.py`: OpenAI-specific tests
+- `test_anthropic_prompt_performance.py`: Anthropic-specific tests
+- `test_groq_prompt_performance.py`: Groq-specific tests
+- `test_prompt_comparison.py`: Comparative analysis between different prompts
+- `test_claude.py`: Claude model-specific tests
+- `test_groq.py`: Groq model-specific tests
+
+### Results Processing
+
+- `process_results.py`: Script for processing and analyzing test results
+- `visualize_results.py`: Script for visualizing test results
+- Results are stored in the `results/` directory with timestamps
+
+### Running Tests
+
+To run tests for a specific provider:
+
+```bash
+# Run all tests
+./run_tests.sh
+
+# Run Anthropic tests
+./run_anthropic_tests.sh
+
+# Run Claude tests
+./run_claude_tests.sh
+
+# Run Groq tests (with parallel execution)
+./run_groq_tests.sh
+```
+
+## GNU Parallel Usage
+
+This project uses GNU Parallel for efficient parallel execution of tests. The `run_groq_tests.sh` script demonstrates this usage:
+
+```bash
+# Install GNU Parallel (if not already installed)
+brew install parallel  # For macOS
+# or
+sudo apt-get install parallel  # For Ubuntu/Debian
+
+# Run tests in parallel
+parallel -j 2 --halt-on-error 1 run_model_tests ::: "${MODELS[@]}"
+```
+
+GNU Parallel is used under the terms of the GNU General Public License version 3 or later. For more information, see the [GNU Parallel documentation](https://www.gnu.org/software/parallel/). 
